@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101c2c">
+  <meta name="description" content="SFEN・盤面編集から長手数の詰将棋をDFPNで探索。解答手順と盤面再生、名前付きローカル保存に対応。">
+  <title>詰将棋ソルバ | SFEN・盤面編集・長手数探索</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="engine.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar">
+      <div class="brand"><div class="brandicon">詰</div><div><div class="suptitle">SFEN TSUME LAB</div><h1>詰将棋ソルバ</h1></div></div>
+      <div class="topmeta"><span class="dot"></span> オフライン計算 <span class="pipe">/</span> ブラウザ内保存</div>
+    </header>
+    <main class="layout">
+      <section class="panel entry" aria-labelledby="inputTitle">
+        <div class="sectionhead"><div><div class="eyebrow">01 / INPUT</div><h2 id="inputTitle">局面を入力</h2></div><button type="button" id="sampleButton" class="textbutton">サンプルを入力</button></div>
+        <label for="sfenInput" class="label">SFEN</label>
+        <textarea id="sfenInput" spellcheck="false" rows="5" placeholder="9/9/… b G 1"></textarea>
+        <div class="inputrow"><label class="upload" for="fileInput"><span aria-hidden="true">⇧</span> SFENファイルを選択</label><input id="fileInput" type="file" accept=".sfen,.txt,.usi,text/plain"><span class="hint">貼り付け・ドラッグ＆ドロップ対応</span></div>
+        <fieldset class="mode"><legend class="label">玉方の持駒</legend>
+          <label class="radioline"><input id="allPieces" type="radio" name="defender" value="all" checked><span><b>残り全部（標準詰将棋）</b><small>盤上・攻方の持駒以外を玉方に補完</small></span></label>
+          <label class="radioline"><input id="sfenPieces" type="radio" name="defender" value="sfen"><span><b>SFEN記載どおり</b><small>実戦の詰み探索向け</small></span></label>
+        </fieldset>
+        <div class="settingshead"><h3>探索方法・上限</h3><span>探索はブラウザ内で実行</span></div>
+        <label class="label algorithmLabel" for="algorithmInput">探索アルゴリズム <select id="algorithmInput"><option value="dfpn" selected>DFPN系（長手数向け・推奨）</option><option value="dfs">反復深化（短手数・最短詰探索）</option></select></label>
+        <div class="settingsgrid">
+          <label>最大手数 <select id="depthInput"><option>5</option><option>7</option><option>9</option><option>11</option><option>13</option><option>15</option><option>17</option><option>21</option><option>25</option><option>31</option><option>41</option><option>61</option><option>101</option><option selected>151</option><option>201</option><option>301</option><option>501</option><option>1001</option><option>2001</option><option>5001</option><option>10001</option><option value="0">無制限（DFPN）</option></select></label>
+          <label>最大時間 <select id="secondsInput"><option value="5">5秒</option><option value="15">15秒</option><option value="30">30秒</option><option value="60">60秒</option><option value="120" selected>120秒</option><option value="180">180秒</option><option value="300">5分</option><option value="600">10分</option><option value="1800">30分</option></select></label>
+          <label>最大探索局面 <select id="nodesInput"><option value="100000">10万</option><option value="500000">50万</option><option value="1500000">150万</option><option value="5000000" selected>500万</option><option value="20000000">2000万</option><option value="50000000">5000万</option></select></label>
+        </div>
+        <p class="footnote" id="depthHint">「無制限」は手数制限のみ解除します。時間・探索局面数の制限は有効です。反復深化方式は99手までです。</p>
+        <div class="actions"><button id="solveButton" class="primary">▶　詰将棋を解く</button><button id="stopButton" class="secondary" disabled>停止</button></div>
+        <div id="status" class="status" aria-live="polite">SFENを入力すると盤面を確認できます。</div>
+        <div id="metrics" class="metrics" hidden></div>
+        <div class="savegroup"><h3>この問題を保存</h3><div class="savebar"><input id="nameInput" type="text" maxlength="80" placeholder="例：7手詰・桂の捨て駒" aria-label="問題名"><button id="saveButton" class="secondary">名前を付けて保存</button></div><p class="footnote">問題、解答、探索設定をこのブラウザの保存領域に記録します。</p></div>
+      </section>
+      <section class="panel preview" aria-labelledby="previewTitle">
+        <div class="sectionhead"><div><div class="eyebrow">02 / ANALYSIS</div><h2 id="previewTitle">盤面・解答手順</h2></div><div class="previewActions"><button id="editorToggle" type="button" class="secondary editorToggle" aria-expanded="false" aria-controls="editorPanel">盤面を編集</button><span id="stepIndicator" class="stepcount">初期局面</span></div></div>
+        <div id="editorPanel" class="editorPanel" hidden>
+          <div class="editorIntro"><strong>盤面編集</strong><span>駒を選んでマスをクリック。右クリックで消去。盤上の駒はドラッグ移動もできます。</span></div>
+          <div class="editorSelectors"><label>駒の所属 <select id="editorSide"><option value="1">▲ 先手</option><option value="-1">△ 後手</option></select></label><label>手番 <select id="editorTurn"><option value="1">▲ 先手番</option><option value="-1">△ 後手番</option></select></label></div>
+          <div class="editorTools"><button type="button" id="toolMove" class="toolSpecial" data-editor-action="move">移動</button><button type="button" id="toolErase" class="toolSpecial" data-editor-action="erase">消去</button><button type="button" id="toolEmpty" class="toolSpecial" data-editor-action="empty">盤面を空に</button></div>
+          <div class="editorPalette" id="editorPalette" aria-label="配置する駒の種類"></div>
+          <div class="editorHandsHeading">持駒の編集（− / ＋）</div>
+          <div id="editorHands" class="editorHands"></div>
+          <div class="editorBottom"><button id="editorCopy" class="textbutton" type="button">現在のSFENをコピー</button><button id="editorDone" class="secondary" type="button">編集を終了</button></div>
+          <p class="footnote">編集中は入力SFENに即時反映されます。保存済み問題を変更しても「保存」を押すまで上書きされません。標準詰将棋モードでは探索時のみ玉方の持駒を補完します。</p>
+        </div>
+        <div class="boardShell"><div class="handarea"><span class="handlabel">△ 後手の持駒</span><span id="whiteHand" class="handvalue">–</span></div><div class="boardrow"><div class="ranks" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>七</span><span>八</span><span>九</span></div><div class="boardWithFiles"><div class="files" aria-hidden="true"><span>９</span><span>８</span><span>７</span><span>６</span><span>５</span><span>４</span><span>３</span><span>２</span><span>１</span></div><div id="board" class="board" aria-label="将棋盤"></div></div></div><div class="handarea bottom"><span class="handlabel">▲ 先手の持駒</span><span id="blackHand" class="handvalue">–</span></div></div>
+        <div class="playback"><button id="firstButton" aria-label="最初へ">|◀</button><button id="prevButton" aria-label="一手戻る">◀</button><input type="range" id="stepSlider" min="0" max="0" value="0" aria-label="棋譜の手数"><button id="nextButton" aria-label="一手進む">▶</button><button id="lastButton" aria-label="最後へ">▶|</button></div>
+        <div id="resultText" class="resultText">探索結果はここに表示されます。</div>
+        <div class="movesheading"><h3>読み筋</h3><button id="copyMovesButton" type="button" class="textbutton" disabled>USIをコピー</button></div>
+        <div id="moves" class="movelist empty">解答を表示すると手順をクリックして局面を再生できます。</div>
+        <p class="footnote">探索は端末内のWeb Workerで実行され、サーバーへSFENを送信しません。長手数モードは最短手数・玉方の最長抵抗を保証しません。無制限は手数の上限だけを解除します。千日手・無駄合など難問特有の判定は完全ではありません。</p>
+      </section>
+    </main>
+    <section class="panel collection" aria-labelledby="collectionTitle"><div class="sectionhead"><div><div class="eyebrow">03 / LIBRARY</div><h2 id="collectionTitle">保存した詰将棋 <span id="savedCount" class="count">0</span></h2></div><div class="libraryActions"><button id="exportButton" class="textbutton">バックアップ出力</button><label class="textbutton importLabel" for="importInput">バックアップ読込</label><input id="importInput" type="file" accept=".json,application/json"></div></div><input id="searchInput" class="filter" type="search" placeholder="問題名・SFENで検索"><div id="savedItems" class="savedItems"></div></section>
+    <footer>SFEN TSUME LAB <span>·</span> GitHub Pages 対応 <span>·</span> ローカル保存</footer>
+  </div>
+</body>
+</html>
